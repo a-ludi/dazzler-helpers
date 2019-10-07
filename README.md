@@ -20,7 +20,7 @@ Install
 --------
 
 Just use `make && sudo make install`. For a local installtion on a per-user basis you may use
-`PREFIX=$HOME make install`.
+`make prefix=$HOME install`.
 
 
 Usage
