@@ -26,7 +26,10 @@ basis you may use `make prefix=$HOME install`.
 Usage
 -----
 
-This section will be filled and extended when new helpers arrive.
+This sections lists available commands. Run each command with `-h` to get more
+information on its usage.
+
+- **`DBln`**: Create a link to Dazzler databases and their hidden files.
 - **`GenBank2DAM`**: Create a Dazzler databases from a GenBank assembly
   storing the accession in the database.
 

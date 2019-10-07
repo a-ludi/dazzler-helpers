@@ -1,4 +1,4 @@
-BINARIES=DBln
+BINARIES=DBln GenBank2DAM
 SOURCE=source
 BUILD=build
 BUILDBIN=$(BUILD)/bin
@@ -16,6 +16,9 @@ all: $(addprefix $(BUILDBIN)/, $(BINARIES))
 
 
 $(BUILDBIN)/DBln: $(SOURCE)/DBln.sh | $(BUILDBIN)
+	ln -s $(realpath $<) $@
+
+$(BUILDBIN)/GenBank2DAM: $(SOURCE)/GenBank2DAM.sh | $(BUILDBIN)
 	ln -s $(realpath $<) $@
 
 
