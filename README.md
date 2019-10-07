@@ -32,6 +32,8 @@ information on its usage.
 - **`DBln`**: Create a link to Dazzler databases and their hidden files.
 - **`GenBank2DAM`**: Create a Dazzler databases from a GenBank assembly
   storing the accession in the database.
+- **`BAM2DB`**: Create or append to a Dazzler database from `.bam` files
+  (or any format supported by `samtools`).
 
 
 Maintainer
