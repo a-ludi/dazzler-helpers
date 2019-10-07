@@ -15,10 +15,7 @@ INSTALL_PROGRAM=$(INSTALL)
 all: $(addprefix $(BUILDBIN)/, $(BINARIES))
 
 
-$(BUILDBIN)/DBln: $(SOURCE)/DBln.sh | $(BUILDBIN)
-	ln -s $(realpath $<) $@
-
-$(BUILDBIN)/GenBank2DAM: $(SOURCE)/GenBank2DAM.sh | $(BUILDBIN)
+$(BUILDBIN)/%: $(SOURCE)/%.sh | $(BUILDBIN)
 	ln -s $(realpath $<) $@
 
 
