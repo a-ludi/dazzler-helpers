@@ -3,7 +3,7 @@ Dazzler Helpers
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 
-> Helpers for the Dazzler suite.
+> A suite of scripts or small executables that help working with [Dazzler](https://dazzlerblog.wordpress.com/) files.
 
 
 Table of Contents
@@ -19,7 +19,8 @@ Table of Contents
 Install
 --------
 
-Just use `make install`.
+Just use `make && sudo make install`. For a local installtion on a per-user basis you may use
+`PREFIX=$HOME make install`.
 
 
 Usage
