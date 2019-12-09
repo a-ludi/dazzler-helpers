@@ -1,4 +1,4 @@
-BINARIES=BAM2DB DBln GenBank2DAM
+BINARIES=BAM2DB DBln GenBank2DAM damapper.slurm daligner.slurm
 SOURCE=source
 BUILD=build
 BUILDBIN=$(BUILD)/bin
