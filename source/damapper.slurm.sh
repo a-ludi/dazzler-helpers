@@ -49,7 +49,7 @@ function log()
 
 function print_usage()
 {
-    echo "USAGE:  $PROG [-h] [--dry-run] [--sbatch=<args>] [<damapper-flags>] <reference:dam> <reads:db>"
+    echo "USAGE:  $PROG [-h] [--dry-run] [--sbatch=<args>] [--blocks=<block-ids>] [<damapper-flags>] <reference:dam> <reads:db>"
 } >&2
 
 
@@ -67,6 +67,7 @@ function print_help()
     echo ' <damapper-flags> All damapper flags are accepted. The parameters -T and -M are'
     echo '                  automatically translated to `sbatch` parameters.'
     echo ' --sbatch=<args>  Pass <args> to call to `sbatch`.'
+    echo ' --blocks=<block-ids>  Align only blocks <block-ids>.'
     echo ' --help, -h       Prints this help.'
     echo ' --usage          Print a short command summary.'
     echo ' --version        Print software version.'
@@ -107,6 +108,9 @@ function parse_args()
                     ;;
                 --sbatch=*)
                     SBATCH_ARGS="${ARG#--sbatch=}"
+                    ;;
+                --blocks=*)
+                    BLOCK_IDS="${ARG#--blocks=}"
                     ;;
                 -h|--help)
                     print_help

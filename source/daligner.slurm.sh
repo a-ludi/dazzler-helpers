@@ -49,7 +49,7 @@ function log()
 
 function print_usage()
 {
-    echo "USAGE:  $PROG [-h] [--dry-run] [--sbatch=<args>] [<daligner-flags>] <reference:dam> <reads:db>"
+    echo "USAGE:  $PROG [-h] [--dry-run] [--sbatch=<args>] [--blocks=<block-ids>] [<daligner-flags>] <reference:dam> <reads:db>"
 } >&2
 
 
@@ -67,13 +67,14 @@ function print_help()
     echo ' <daligner-flags> All daligner flags are accepted. The parameters -T and -M are'
     echo '                  automatically translated to `sbatch` parameters.'
     echo ' --sbatch=<args>  Pass <args> to call to `sbatch`.'
+    echo ' --blocks=<block-ids>  Align only blocks <block-ids>.'
     echo ' --help, -h       Prints this help.'
     echo ' --usage          Print a short command summary.'
     echo ' --version        Print software version.'
     echo
     echo 'Envorinment variables:'
     echo ' BLOCK_IDS        Pass a list of blocks to align. Takes the same format as'
-    echo '                  `sbatch --array`'
+    echo '                  `sbatch --array`.'
     echo '                  automatically translated to `sbatch` parameters.'
     echo ' --dry-run, -n    Print the sbatch script to stdout and do nothing else.'
     echo ' --sbatch=<args>  Pass <args> to call to `sbatch`.'
@@ -107,6 +108,9 @@ function parse_args()
                     ;;
                 --sbatch=*)
                     SBATCH_ARGS="${ARG#--sbatch=}"
+                    ;;
+                --blocks=*)
+                    BLOCK_IDS="${ARG#--blocks=}"
                     ;;
                 -h|--help)
                     print_help
