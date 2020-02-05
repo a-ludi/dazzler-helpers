@@ -63,7 +63,14 @@ function add_source_to_db()
 
     echo -n "Processing $SOURCE ... " >&2
     samtools view "$SOURCE" | \
-        awk -F'\t' '{ printf ">%s\n%s\n", $1, $10 }' | \
+        awk -F'\t' '
+            function optfield(id, type) {
+                for (i = 12; i <= NF; ++i)
+                    if (id == substr($i, 1, 2) && substr($i, 4, 1) == type)
+                        return substr($i, 6);
+            }
+            { printf ">%s RQ=%s\n%s\n", $1, optfield("rq", "f"), $10 }
+        ' | \
         fold -w9999 | \
         fasta2DB -i "$DB"
     echo "done" >&2
