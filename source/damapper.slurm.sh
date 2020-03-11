@@ -8,7 +8,7 @@ PROG="$(basename "$0")"
 
 function set_defaults()
 {
-    SBATCH_ARGS=""
+    declare -a SBATCH_ARGS
     NUM_THREADS=4
     MAX_MEMGB=0
 }
@@ -49,7 +49,7 @@ function log()
 
 function print_usage()
 {
-    echo "USAGE:  $PROG [-h] [--dry-run] [--sbatch=<args>] [--blocks=<block-ids>] [<damapper-flags>] <reference:dam> <reads:db>"
+    echo "USAGE:  $PROG [-h] [--dry-run] [--sbatch=<arg> ...] [--blocks=<block-ids>] [<damapper-flags>] <reference:dam> <reads:db> ..."
 } >&2
 
 
@@ -77,7 +77,7 @@ function print_help()
     echo '                  `sbatch --array`'
     echo '                  automatically translated to `sbatch` parameters.'
     echo ' --dry-run, -n    Print the sbatch script to stdout and do nothing else.'
-    echo ' --sbatch=<args>  Pass <args> to call to `sbatch`.'
+    echo ' --sbatch=<arg>   Pass <arg> to `sbatch`; repeat for multiple args.'
     echo ' --help, -h       Prints this help.'
     echo ' --usage          Print a short command summary.'
     echo ' --version        Print software version.'
@@ -107,7 +107,7 @@ function parse_args()
                     DRYRUN=1
                     ;;
                 --sbatch=*)
-                    SBATCH_ARGS="${ARG#--sbatch=}"
+                    SBATCH_ARGS+=( "${ARG#--sbatch=}" )
                     ;;
                 --blocks=*)
                     BLOCK_IDS="${ARG#--blocks=}"
@@ -128,11 +128,11 @@ function parse_args()
                     exit
                     ;;
                 -T*)
-                    NUM_THREADS=$(( "${ARG#-T}" ))
+                    NUM_THREADS=$(( ${ARG#-T} ))
                     DAMAPPER_ARGS+=("$ARG")
                     ;;
                 -M*)
-                    MAX_MEMGB=$(( "${ARG#-M}" ))
+                    MAX_MEMGB=$(( ${ARG#-M} ))
                     DAMAPPER_ARGS+=("$ARG")
                     ;;
                 -[vbpzCN]|-[vbpzCN][vbpzCN]|-[vbpzCN][vbpzCN][vbpzCN]|-[vbpzCN][vbpzCN][vbpzCN][vbpzCN]|-[vbpzCN][vbpzCN][vbpzCN][vbpzCN][vbpzCN]|-[vbpzCN][vbpzCN][vbpzCN][vbpzCN][vbpzCN][vbpzCN]|-k*|-t*|-P*|-e*|-s*|-n*|-m*)
@@ -187,6 +187,10 @@ function build_damapper_script()
     echo "#SBATCH --array=${BLOCK_IDS:-1-$NUM_READS_BLOCKS}"
     echo "#SBATCH --cpus-per-task=$NUM_THREADS"
     (( MAX_MEMGB == 0 )) || echo "#SBATCH --mem=${MAX_MEMGB}G"
+    for ARG in "${SBATCH_ARGS[@]}"
+    do
+        echo "#SBATCH $ARG"
+    done
     echo
     echo 'damapper' "${DAMAPPER_ARGS:+${DAMAPPER_ARGS[@]}}" "$REFERENCE" "$READS.\$SLURM_ARRAY_TASK_ID.$READS_TYPE"
 }
@@ -209,7 +213,7 @@ function write_damapper_script()
 
 function dispatch_jobs()
 {
-    sbatch $SBATCH_ARGS "$DAMAPPER_SCRIPT"
+    sbatch "$DAMAPPER_SCRIPT"
 }
 
 
