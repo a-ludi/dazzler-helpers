@@ -1,4 +1,4 @@
-BINARIES=BAM2DB DBln GenBank2DAM damapper.slurm daligner.slurm
+BINARIES=BAM2DB DBln GenBank2DAM damapper.slurm daligner.slurm bed2mask
 SOURCE=source
 BUILD=build
 BUILDBIN=$(BUILD)/bin
@@ -6,6 +6,8 @@ BUILDBIN=$(BUILD)/bin
 prefix=/usr/local
 exec_prefix=$(prefix)
 bindir=$(exec_prefix)/bin
+dubflags=
+build=debug
 
 INSTALL=install
 INSTALL_PROGRAM=$(INSTALL)
@@ -17,6 +19,10 @@ all: $(addprefix $(BUILDBIN)/, $(BINARIES))
 
 $(BUILDBIN)/%: $(SOURCE)/%.sh | $(BUILDBIN)
 	ln -s $(realpath $<) $@
+
+
+$(BUILDBIN)/%: $(SOURCE)/%.d | $(BUILDBIN)
+	dub build $(dubflags) $< --single --build=$(build) && mv $(basename $<) $(BUILDBIN)
 
 
 .PHONY: all
