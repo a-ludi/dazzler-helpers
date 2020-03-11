@@ -18,7 +18,7 @@ function error()
 {
     if (( $# > 0 ));
     then
-        echo "$PROG: error: $@"
+        echo "$PROG: error:" "$@"
     else
         echo
     fi
@@ -43,7 +43,7 @@ function bail_out_usage()
 
 function log()
 {
-    echo "-- $@"
+    echo "--" "$@"
 } >&2
 
 
