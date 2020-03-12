@@ -9,6 +9,10 @@ PROG="$(basename "$0")"
 function set_defaults()
 {
     declare -a SBATCH_ARGS
+    declare -a DB_STUBS
+    declare -a DB_TYPES
+    declare -a DB_FILES
+    declare -a DB_BLOCKS
     NUM_THREADS=4
     MAX_MEMGB=0
 }
@@ -49,7 +53,7 @@ function log()
 
 function print_usage()
 {
-    echo "USAGE:  $PROG [-h] [--dry-run] [--sbatch=<arg> ...] [--blocks=<block-ids>] [<daligner-flags>] <subject:db|dam> <target:db|dam> ..."
+    echo "USAGE:  $PROG [-h] [--dry-run] [--print-plan] [--sbatch=<arg> ...] [<daligner-flags>] <subject:db|dam>[@<id-spec>] [<target:db|dam>[@<id-spec>] ...]"
 } >&2
 
 
@@ -57,30 +61,28 @@ function print_help()
 {
     print_usage
     echo
-    echo 'Run daligner on every block of <reads:db> using `sbatch`.'
+    echo 'Run daligner on every combination of blocks using `sbatch`.'
     echo
     echo 'Positional arguments:'
-    echo ' <reference:dam>  Reference'
-    echo ' <reads:db>       Reads/queries. Note: this script accepts exactly one DB.'
+    echo ' <subject:db|dam> DB with A-reads'
+    echo ' <target:db|dam>  DB(s) with B-reads. Uses <subject> and `-I` if ommitted.'
     echo
     echo 'Optional arguments:'
     echo ' <daligner-flags> All daligner flags are accepted. The parameters -T and -M are'
     echo '                  automatically translated to `sbatch` parameters.'
+    echo ' --dry-run, -n    Print the sbatch script to stdout and exit.'
+    echo ' --print-plan, -p Print execution plan and exit.'
     echo ' --sbatch=<args>  Pass <args> to call to `sbatch`.'
-    echo ' --blocks=<block-ids>  Align only blocks <block-ids>.'
     echo ' --help, -h       Prints this help.'
     echo ' --usage          Print a short command summary.'
+    echo ' --version        Print software version.'
     echo ' --version        Print software version.'
     echo
-    echo 'Envorinment variables:'
-    echo ' BLOCK_IDS        Pass a list of blocks to align. Takes the same format as'
-    echo '                  `sbatch --array`.'
-    echo '                  automatically translated to `sbatch` parameters.'
-    echo ' --dry-run, -n    Print the sbatch script to stdout and do nothing else.'
-    echo ' --sbatch=<arg>   Pass <arg> to `sbatch`; repeat for multiple args.'
-    echo ' --help, -h       Prints this help.'
-    echo ' --usage          Print a short command summary.'
-    echo ' --version        Print software version.'
+    echo '@-syntax definition:'
+    echo ' <id-spec>      ::== <id-spec-item>[,<id-spec-item> ...]'
+    echo ' <id-spec-item> ::== <id>|<id-range>'
+    echo ' <id-range>     ::== <id>-<id>'
+    echo ' <id>           ::== <non-zero-digit>[<digit> ...]'
 } >&2
 
 
@@ -104,13 +106,13 @@ function parse_args()
         then
             case "$ARG" in
                 --dry-run|-n)
-                    DRYRUN=1
+                    DRY_RUN=1
+                    ;;
+                --print-plan)
+                    PRINT_PLAN=1
                     ;;
                 --sbatch=*)
                     SBATCH_ARGS+=( "${ARG#--sbatch=}" )
-                    ;;
-                --blocks=*)
-                    BLOCK_IDS="${ARG#--blocks=}"
                     ;;
                 -h|--help)
                     print_help
@@ -145,35 +147,57 @@ function parse_args()
     done
 
     (( ${#ARGS[*]} >= 1 )) || bail_out_usage "<subject> is missing"
-    REFERENCE="${ARGS[0]}"
 
-    (( ${#ARGS[*]} >= 2 )) || bail_out_usage "<reads> is/are missing"
-    READS="${ARGS[1]}"
+    parse_db_args "${ARGS[@]}"
+}
 
-    if [[ "$READS" =~ @([1-9][0-9]*(-[1-9][0-9]*)?)$ ]]
-    then
-        READS="${READS%@*}"
-        BLOCK_IDS="${BASH_REMATCH[1]}"
-    fi
 
-    if [[ "$READS" =~ \.(dam|db)$ ]];
-    then
-        READS_TYPE="${READS##*.}"
-        READS="${READS%.*}"
-    else
-        if [[ -e "$READS.db" ]];
+function parse_db_args()
+{
+    local I
+    for (( I = 0; I < $#; ++I ))
+    do
+        local II=$(( I + 1 ))
+        local DB="${!II}"
+        if [[ "$DB" =~ @ ]]
         then
-            READS_TYPE="db"
-        elif [[ -e "$READS.dam" ]];
-        then
-            READS_TYPE="dam"
-        else
-            bail_out "cannot infer type of <reads:db>"
+            parse_db_blocks "${DB##*@}" > /dev/null || bail_out "invalid @-syntax: $DB"
+            DB_BLOCKS[$I]="${DB##*@}"
+            DB="${DB%@*}"
         fi
-    fi
-    READS_FILE="$READS.$READS_TYPE"
 
-    (( ${#ARGS[*]} == 2 )) || bail_out_usage "too many arguments"
+        if [[ "$DB" =~ \.(dam|db)$ ]];
+        then
+            DB_TYPES[$I]="${DB##*.}"
+            DB_STUBS[$I]="${DB%.*}"
+        else
+            if [[ -e "$DB.db" ]];
+            then
+                DB_TYPES[$I]="db"
+            elif [[ -e "$DB.dam" ]];
+            then
+                DB_TYPES[$I]="dam"
+            else
+                bail_out "cannot infer type of DB: $DB"
+            fi
+        fi
+
+        DB_FILES[$I]="${DB_STUBS[$I]}.${DB_TYPES[$I]}"
+    done
+
+    NUM_DBS="${#DB_FILES[*]}"
+}
+
+
+function dry_run()
+{
+    [[ -v DRY_RUN ]]
+}
+
+
+function should_print_plan()
+{
+    [[ -v PRINT_PLAN ]]
 }
 
 
@@ -188,18 +212,141 @@ function get_num_blocks()
 }
 
 
+function prepare_block_ids()
+{
+    NUM_JOBS=1
+    local I
+    for (( I = 0; I < NUM_DBS; ++I ))
+    do
+        local DB="${DB_FILES[$I]}"
+        local NUM_BLOCKS=$(( $(get_num_blocks "$DB") ))
+        local BLOCKS="${DB_BLOCKS[$I]:-}"
+
+        if [[ -n "$BLOCKS" ]]
+        then
+            parse_db_blocks "$BLOCKS" | while read -r BLOCK_ID
+            do
+                (( 1 <= BLOCK_ID && BLOCK_ID <= NUM_BLOCKS )) || \
+                    bail_out "invalid blocks-spec '$BLOCKS': $BLOCK_ID out of bounds"
+            done
+
+            (( NUM_JOBS *= $(parse_db_blocks "$BLOCKS" | wc -l) ))
+        else
+            DB_BLOCKS[$I]="1-$NUM_BLOCKS"
+            (( NUM_JOBS *= NUM_BLOCKS ))
+        fi
+    done
+
+    if (( NUM_DBS == 1 ))
+    then
+        NUM_JOBS=$(( (NUM_JOBS * (NUM_JOBS + 1)) / 2 ))
+    fi
+}
+
+
+function parse_db_blocks()
+{
+    while IFS='-' read -rd',' FROM TO
+    do
+        if [[ -n "${TO:-}" ]]
+        then
+            (( FROM <= TO )) || bail_out "invalid blocks-spec '$FROM-$TO': <to> must be greater than or equal to <from>"
+
+            local I
+            for (( I = FROM; I <= TO; ++I ))
+            do
+                echo "$I"
+            done
+        else
+            echo "$FROM"
+        fi
+    done <<<"$1,"
+}
+
+
+function build_db_args_script()
+{
+    cat <<-'EOF'
+		JOB_IDX=$(( SLURM_ARRAY_TASK_ID - 1 ))
+		if (( NUM_DBS == 1 ))
+		then
+		    BLOCKS=( $(parse_db_blocks "${DB_BLOCKS[0]}") )
+
+		    A_IDX=0
+		    B_IDX=0
+		    local I
+		    for (( I = 0; I < JOB_IDX; ++I ))
+		    do
+		        if (( B_IDX + 1 < ${#BLOCKS[*]} ))
+		        then
+		            (( ++B_IDX ))
+		        else
+		            (( ++A_IDX ))
+		            B_IDX="$A_IDX"
+		        fi
+		    done
+
+		    DB_ARGS=(
+		        "-I"
+		        "${DB_STUBS[0]}.${BLOCKS[A_IDX]}"
+		        "${DB_STUBS[0]}.${BLOCKS[B_IDX]}"
+		    )
+		else
+		    local I
+		    for (( I = NUM_DBS - 1; I >= 0; --I ))
+		    do
+		        BLOCKS=( $(parse_db_blocks "${DB_BLOCKS[$I]}") )
+		        BLOCK_IDX=$(( JOB_IDX % ${#BLOCKS[*]} ))
+		        JOB_IDX=$(( JOB_IDX / ${#BLOCKS[*]} ))
+		        DB_ARGS[$I]="${DB_STUBS[$I]}.${BLOCKS[$BLOCK_IDX]}"
+		    done
+		fi
+EOF
+}
+
+
 function build_damapper_script()
 {
     echo '#!/bin/bash'
-    echo "#SBATCH --array=${BLOCK_IDS:-1-$NUM_READS_BLOCKS}"
+    echo "#SBATCH --array=1-$NUM_JOBS"
     echo "#SBATCH --cpus-per-task=$NUM_THREADS"
     (( MAX_MEMGB == 0 )) || echo "#SBATCH --mem=${MAX_MEMGB}G"
     for ARG in "${SBATCH_ARGS[@]}"
     do
         echo "#SBATCH $ARG"
     done
+    echo "NUM_DBS='$NUM_DBS'"
+    echo 'DB_STUBS=('
+    for DB_STUB in "${DB_STUBS[@]}"
+    do
+        echo "    $DB_STUB"
+    done
+    echo ')'
+    echo 'DB_BLOCKS=('
+    for DB_BLOCK in "${DB_BLOCKS[@]}"
+    do
+        echo "    $DB_BLOCK"
+    done
+    echo ')'
     echo
-    echo 'daligner' "${DALIGNER_ARGS:+${DALIGNER_ARGS[@]}}" "$REFERENCE" "$READS.\$SLURM_ARRAY_TASK_ID.$READS_TYPE"
+    build_db_args_script
+    echo
+    echo "daligner" "${DALIGNER_ARGS:+${DALIGNER_ARGS[@]}}" '"${DB_ARGS[@]}"'
+}
+
+
+function print_plan()
+{
+    # set -x
+    for (( SLURM_ARRAY_TASK_ID = 1; SLURM_ARRAY_TASK_ID <= NUM_JOBS; ++SLURM_ARRAY_TASK_ID ))
+    do
+        eval "$(build_db_args_script)"
+
+        ! dry_run || echo -n '# '
+        echo "JOB_ID=$SLURM_ARRAY_TASK_ID daligner" "${DALIGNER_ARGS:+${DALIGNER_ARGS[@]}}" \
+                "${DB_ARGS[@]}"
+    done
+    # set +x
 }
 
 
@@ -209,11 +356,11 @@ function write_damapper_script()
     # clean up on script end
     trap 'rm -f "$DALIGNER_SCRIPT"' EXIT
 
-    if (( ${DRYRUN:-0} == 0 ));
+    if dry_run
     then
-        build_damapper_script > "$DALIGNER_SCRIPT"
-    else
         build_damapper_script
+    else
+        build_damapper_script > "$DALIGNER_SCRIPT"
     fi
 }
 
@@ -229,11 +376,15 @@ function main()
     set_defaults
     parse_args "$@"
 
-    NUM_READS_BLOCKS=$(( $(get_num_blocks "$READS_FILE") ))
+    prepare_block_ids
     write_damapper_script
 
-    if (( ${DRYRUN:-0} == 0 ));
+    if should_print_plan
     then
+        print_plan
+    elif ! dry_run
+    then
+        export -f parse_db_blocks
         dispatch_jobs
     fi
 }
