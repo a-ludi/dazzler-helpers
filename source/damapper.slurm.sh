@@ -187,10 +187,13 @@ function build_damapper_script()
     echo "#SBATCH --array=${BLOCK_IDS:-1-$NUM_READS_BLOCKS}"
     echo "#SBATCH --cpus-per-task=$NUM_THREADS"
     (( MAX_MEMGB == 0 )) || echo "#SBATCH --mem=${MAX_MEMGB}G"
-    for ARG in "${SBATCH_ARGS[@]}"
-    do
-        echo "#SBATCH $ARG"
-    done
+    if (( ${#SBATCH_ARGS[*]} > 0 ))
+    then
+        for ARG in "${SBATCH_ARGS[@]}"
+        do
+            echo "#SBATCH $ARG"
+        done
+    fi
     echo
     echo 'damapper' "${DAMAPPER_ARGS:+${DAMAPPER_ARGS[@]}}" "$REFERENCE" "$READS.\$SLURM_ARRAY_TASK_ID.$READS_TYPE"
 }

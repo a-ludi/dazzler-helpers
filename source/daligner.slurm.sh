@@ -274,7 +274,6 @@ function build_db_args_script()
 
 		    A_IDX=0
 		    B_IDX=0
-		    local I
 		    for (( I = 0; I < JOB_IDX; ++I ))
 		    do
 		        if (( B_IDX + 1 < ${#BLOCKS[*]} ))
@@ -292,7 +291,6 @@ function build_db_args_script()
 		        "${DB_STUBS[0]}.${BLOCKS[B_IDX]}"
 		    )
 		else
-		    local I
 		    for (( I = NUM_DBS - 1; I >= 0; --I ))
 		    do
 		        BLOCKS=( $(parse_db_blocks "${DB_BLOCKS[$I]}") )
@@ -311,10 +309,13 @@ function build_damapper_script()
     echo "#SBATCH --array=1-$NUM_JOBS"
     echo "#SBATCH --cpus-per-task=$NUM_THREADS"
     (( MAX_MEMGB == 0 )) || echo "#SBATCH --mem=${MAX_MEMGB}G"
-    for ARG in "${SBATCH_ARGS[@]}"
-    do
-        echo "#SBATCH $ARG"
-    done
+    if (( ${#SBATCH_ARGS[*]} > 0 ))
+    then
+        for ARG in "${SBATCH_ARGS[@]}"
+        do
+            echo "#SBATCH $ARG"
+        done
+    fi
     echo "NUM_DBS='$NUM_DBS'"
     echo 'DB_STUBS=('
     for DB_STUB in "${DB_STUBS[@]}"
