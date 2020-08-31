@@ -65,7 +65,7 @@ function print_help()
     echo
     echo 'Positional arguments:'
     echo ' <subject:db|dam> DB with A-reads'
-    echo ' <target:db|dam>  DB(s) with B-reads. Uses <subject> and `-I` if ommitted.'
+    echo ' <target:db|dam>  DB(s) with B-reads; uses <subject> if ommitted.'
     echo
     echo 'Optional arguments:'
     echo ' <daligner-flags> All daligner flags are accepted. The parameters -T and -M are'
@@ -171,6 +171,7 @@ function parse_db_args()
             DB_TYPES[$I]="${DB##*.}"
             DB_STUBS[$I]="${DB%.*}"
         else
+            DB_STUBS[$I]="$DB"
             if [[ -e "$DB.db" ]];
             then
                 DB_TYPES[$I]="db"
@@ -286,7 +287,6 @@ function build_db_args_script()
 		    done
 
 		    DB_ARGS=(
-		        "-I"
 		        "${DB_STUBS[0]}.${BLOCKS[A_IDX]}"
 		        "${DB_STUBS[0]}.${BLOCKS[B_IDX]}"
 		    )
