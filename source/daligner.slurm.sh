@@ -309,7 +309,7 @@ function build_damapper_script()
     echo "#SBATCH --array=1-$NUM_JOBS"
     echo "#SBATCH --cpus-per-task=$NUM_THREADS"
     (( MAX_MEMGB == 0 )) || echo "#SBATCH --mem=${MAX_MEMGB}G"
-    if (( ${#SBATCH_ARGS[*]} > 0 ))
+    if [[ -v SBATCH_ARGS ]] && (( ${#SBATCH_ARGS[*]} > 0 ))
     then
         for ARG in "${SBATCH_ARGS[@]}"
         do
